@@ -36,10 +36,7 @@ as long as they have Python installed.
 
 # 3. Develop
 
-This application requires: Python >=3.6
-It uses https://pypi.org/project/exif/
-- **Found issues?** Then please [**file an issue** here](https://github.com/s)
-or send me by mail the logs.
-[Contact me via _hello@rubenmartinez.me_](mailto:hello@rubenmartinez.me) if you have any issues.
+This application requires Python >=3.6 and the project [exif 1.0.0](https://pypi.org/project/exif/).
+- **Found issues?** Then please **file an issue** [here](https://github.com/ruben-mar/Olympus-file-manager/issues).
 
 
