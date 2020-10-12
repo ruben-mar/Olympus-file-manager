@@ -33,7 +33,7 @@ def list_jpgs(candidates):
     jpgs = []
     for i in range(0,len(candidates)):
         file = candidates[i].split('.',maxsplit=1)
-        if fnmatch.fnmatch(file[1], 'JPG'):
+        if fnmatch.fnmatch(file[1], '[Jj][Pp][Gg]'):
            jpgs.append(candidates[i])
     return jpgs
 
@@ -47,7 +47,7 @@ def list_orfs(candidates):
     orfs = []
     for i in range(0,len(candidates)):
         file = candidates[i].split('.',maxsplit=1)
-        if fnmatch.fnmatch(file[1], 'ORF'):
+        if fnmatch.fnmatch(file[1], '[Oo][Rr][Ff]'):
            orfs.append(candidates[i])
     return orfs
 
