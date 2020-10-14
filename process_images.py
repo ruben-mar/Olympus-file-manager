@@ -6,8 +6,10 @@ The date is not extracted from the ORF file (see https://exiftool.org/TagNames/O
 """
 
 import os
+import re
 import fnmatch
 from exif import Image # https://pypi.org/project/exif/ It cannot process .ORF files
+
 
 def show_menu():
     print()
@@ -19,54 +21,33 @@ def show_menu():
     option = input("\nEnter your option: ")
     return option
 
-    
-def list_files(path):
+
+def classify_by_extension(path):
     # Return a list containing the names of the entries in the directory given by path.
     if os.path.exists(path):
         candidates = sorted(os.listdir(path))
         # Change to the target directory in the same way as the UNIX cd command.
-        os.chdir(path)
-    return candidates
-
-
-def list_jpgs(candidates):
-    jpgs = []
+        os.chdir(path) 
+    jpgs, orfs = [], []
     for i in range(0,len(candidates)):
         file = candidates[i].split('.',maxsplit=1)
         if fnmatch.fnmatch(file[1], '[Jj][Pp][Gg]'):
-           jpgs.append(candidates[i])
-    return jpgs
+            jpgs.append(candidates[i])
+        elif fnmatch.fnmatch(file[1], '[Oo][Rr][Ff]'):
+            orfs.append(candidates[i])
+    return jpgs, orfs
 
 
-def show_files(candidates):
-    for elem in candidates:
-        print(elem)
-
-
-def list_orfs(candidates):
-    orfs = []
-    for i in range(0,len(candidates)):
-        file = candidates[i].split('.',maxsplit=1)
-        if fnmatch.fnmatch(file[1], '[Oo][Rr][Ff]'):
-           orfs.append(candidates[i])
-    return orfs
-
-
-def triage_files(candidates, jpgs, orfs):
-    paired = []
+def find_mismatch(classified):
     unpaired = []
-    for candidate in candidates:
-        file = candidate.split('.',maxsplit=1)
-        extension = file[1]
-        reconstructed = str(file[0])+'.JPG'
-        if fnmatch.fnmatch(extension, 'ORF') and reconstructed in jpgs:
-            print("{} to paired".format(candidate))
-            paired.append(candidate)
-        elif fnmatch.fnmatch(extension, 'ORF') and reconstructed not in jpgs:
+    for candidate in classified[0]+classified[1]:
+        filename = candidate.split('.')
+        reconstructed = str(filename[0])+'.JPG'
+        regexp = r'[Oo][Rr][Ff]'
+        z = re.match(regexp,filename[1])
+        if z and reconstructed.lower() not in classified[0]:
             print("{} to unpaired".format(candidate))
             unpaired.append(candidate)
-    print("Paired are {}".format(paired))
-    print("Unpaired are {}".format(unpaired))
     return unpaired
 
 
@@ -96,10 +77,12 @@ def rename_files(jpgs, orfs):
 # MAIN
 
 # Ask where the folder with the files is.
-path = input("Enter the location of the folder containing the JPEG files, for instance /home/user/pics: ")
+path = input("Enter the location of the folder containing the Olympus files, for instance /home/user/pics: ")
 
-content_dir =  list_files(path)
+unpaired = find_mismatch(classify_by_extension(path))
+remove_unpaired(unpaired)
 
+"""
 option = show_menu()
 
 while option != '0':
@@ -121,3 +104,4 @@ while option != '0':
     option = show_menu()        
 
 print("\nBye.\n")
+"""
