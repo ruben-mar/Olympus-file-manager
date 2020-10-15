@@ -8,26 +8,41 @@ The date is not extracted from the ORF file (see https://exiftool.org/TagNames/O
 import os
 import re
 import fnmatch
+from itertools import islice
 from exif import Image # https://pypi.org/project/exif/ It cannot process .ORF files
 
+MAX = 5 # Limit of number of files to list in the output
 
 def show_menu():
     print()
     print("Enter 1 to see the list of files.")
-    print("Enter 2 to triage files.")
-    print("Enter 3 to remove orphan ORF files.")
-    print("Enter 4 to rename files with their EXIF date.")
+    print("Enter 2 to remove orphan ORF files.")
+    print("Enter 3 to rename files with their EXIF date.")
     print("Enter 0 to exit the application.")    
     option = input("\nEnter your option: ")
     return option
 
 
-def classify_by_extension(path):
-    # Return a list containing the names of the entries in the directory given by path.
+def list_files(path):
     if os.path.exists(path):
         candidates = sorted(os.listdir(path))
         # Change to the target directory in the same way as the UNIX cd command.
         os.chdir(path) 
+        return(candidates)
+
+
+def show_files(files, path):
+    fslashes = len([key for key, val in enumerate(path) if val in set(["/"])]) 
+    print("\nThere are {} files in [...]/{}. These are the first {}:\n".format(len(files),path.split("/")[fslashes],MAX))
+    count = 0
+    while count < MAX:
+        for i in islice(files, 0, MAX):
+            count += 1
+            print(i)
+
+
+def classify_by_extension(candidates):
+    # Return a list containing the names of the entries in the directory given by path.
     jpgs, orfs = [], []
     for i in range(0,len(candidates)):
         file = candidates[i].split('.',maxsplit=1)
@@ -46,18 +61,22 @@ def find_mismatch(classified):
         regexp = r'[Oo][Rr][Ff]'
         z = re.match(regexp,filename[1])
         if z and reconstructed.lower() not in classified[0]:
-            print("{} to unpaired".format(candidate))
             unpaired.append(candidate)
     return unpaired
 
 
 def remove_unpaired(orphan_orfs):
-    for orphan in orphan_orfs:
-        try:
-            os.remove(orphan)
-            print("Removed {}".format(orphan))
-        except OSError as e:  ## if failed, report it back to the user ##
-            print("Error: %s - %s." % (e.file, e.strerror))
+    count = 0
+    if isinstance(orphan_orfs,list) and len(orphan_orfs) >0:
+        print("\nThere are {} ORF raw files without equivalent JPG compressed versions. These are the first {}:\n".format(len(orphan_orfs),MAX))
+        for orphan in orphan_orfs:
+            try:
+                os.remove(orphan)
+                while count < MAX:            
+                    print("Removed {}".format(orphan))
+                    count += 1
+            except OSError as e:  ## if failed, report it back to the user ##
+                print("Error: %s - %s." % (e.file, e.strerror))
 
 
 def rename_files(jpgs, orfs):
@@ -78,25 +97,18 @@ def rename_files(jpgs, orfs):
 
 # Ask where the folder with the files is.
 path = input("Enter the location of the folder containing the Olympus files, for instance /home/user/pics: ")
+files = list_files(path)
 
-unpaired = find_mismatch(classify_by_extension(path))
-remove_unpaired(unpaired)
-
-"""
 option = show_menu()
 
 while option != '0':
     if option == '1':
-        show_files(content_dir)
+        show_files(files,path)
     elif option == '2':
-        compressed = list_jpgs(content_dir)
-        raws = list_orfs(content_dir)
-        orphaned = triage_files(content_dir, compressed, raws)
+        remove_unpaired(find_mismatch(classify_by_extension(files)))
+        print("\nAll the ORF files withosut equivalent JPEG were deleted.")
     elif option == '3':
-        remove_unpaired(orphaned)
-        print("\nAll the ORF files without equivalent JPEG were deleted.")
-    elif option == '4':
-        rename_files(compressed, raws)
+        rename_files(classify_by_extension(files)[0], classify_by_extension(files)[1])
     else:
         print("\nWrong option.")
         
@@ -104,4 +116,3 @@ while option != '0':
     option = show_menu()        
 
 print("\nBye.\n")
-"""
