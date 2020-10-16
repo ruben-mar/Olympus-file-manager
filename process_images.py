@@ -23,7 +23,7 @@ def show_menu():
     return option
 
 
-def list_files(path):
+def list_files(path) -> list:
     if os.path.exists(path):
         candidates = sorted(os.listdir(path))
         # Change to the target directory in the same way as the UNIX cd command.
@@ -39,10 +39,10 @@ def show_files(files, path):
         for i in islice(files, 0, MAX):
             count += 1
             print(i)
+    print('[...]\n')
 
 
 def classify_by_extension(candidates):
-    # Return a list containing the names of the entries in the directory given by path.
     jpgs, orfs = [], []
     for i in range(0,len(candidates)):
         file = candidates[i].split('.',maxsplit=1)
@@ -66,53 +66,61 @@ def find_mismatch(classified):
 
 
 def remove_unpaired(orphan_orfs):
-    count = 0
-    if isinstance(orphan_orfs,list) and len(orphan_orfs) >0:
-        print("\nThere are {} ORF raw files without equivalent JPG compressed versions. These are the first {}:\n".format(len(orphan_orfs),MAX))
+    if isinstance(orphan_orfs,list) and len(orphan_orfs) > 0:
+        print("\nThere are {} ORF raw files without equivalent JPG compressed versions.\n".format(len(orphan_orfs)))
         for orphan in orphan_orfs:
             try:
                 os.remove(orphan)
-                while count < MAX:            
-                    print("Removed {}".format(orphan))
-                    count += 1
+                print("Removed {}".format(orphan))        
             except OSError as e:  ## if failed, report it back to the user ##
                 print("Error: %s - %s." % (e.file, e.strerror))
 
 
 def rename_files(jpgs, orfs):
-    for file in jpgs:
-        filename = file.split('.',maxsplit=1)[0]
-        tagged = Image(file)
+    count = 0
+    for jpg in jpgs:
+        filename = jpg.split('.',maxsplit=1)[0]
+        tagged = Image(jpg)
         new_name = tagged.datetime_original.replace(":", "").replace(" ","_")
         new_jpg_name = new_name + '.jpg'
-        print(file ,' > ', new_jpg_name)
-        os.rename(file,new_jpg_name)
-        orf = filename + '.ORF'
-        if orf in orfs: # Tests whether there are ORF files as well as JPEG ones.
+        if jpg != new_jpg_name:
+            os.rename(jpg,new_jpg_name)
+            count += 1
+            print(jpg ,' > ', new_jpg_name)
+        orf = filename + '.' +'orf' 
+        if orf in orfs:
             new_orf_name = new_name + '.orf'
-            print(orf ,' > ', new_orf_name)
-            os.rename(orf,new_orf_name)
-
+            if orf != new_orf_name:
+                os.rename(orf,new_orf_name)
+                count += 1
+                print(orf ,' > ', new_orf_name)
+    return count 
 # MAIN
 
 # Ask where the folder with the files is.
 path = input("Enter the location of the folder containing the Olympus files, for instance /home/user/pics: ")
-files = list_files(path)
 
 option = show_menu()
 
 while option != '0':
+    files = list_files(path) # refresh the list so that the options are independent of their previous one
     if option == '1':
         show_files(files,path)
     elif option == '2':
-        remove_unpaired(find_mismatch(classify_by_extension(files)))
-        print("\nAll the ORF files withosut equivalent JPEG were deleted.")
+        if remove_unpaired(find_mismatch(classify_by_extension(files))):
+            print("\nAll the ORF files without equivalent JPEG were deleted.")
+        else:
+            print("\nAll the raw ORF files have compressed JPEG versions. No raw file to remove.")
     elif option == '3':
-        rename_files(classify_by_extension(files)[0], classify_by_extension(files)[1])
+        res = rename_files(classify_by_extension(files)[0], classify_by_extension(files)[1])
+        if res > 0:
+            print("Renamed {} files with their EXIF dates.".format(res))
+        else:
+            print("\nNo file renamed.")
+
     else:
         print("\nWrong option.")
         
-    content_dir =  list_files(path)
     option = show_menu()        
 
-print("\nBye.\n")
+print("\nBye.\n")   
