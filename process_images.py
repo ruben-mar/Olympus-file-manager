@@ -10,6 +10,7 @@ import re
 import fnmatch
 from itertools import islice
 from exif import Image # https://pypi.org/project/exif/ It cannot process .ORF files
+import pandas as pd
 
 MAX = 5 # Limit of number of files to list in the output
 
@@ -28,7 +29,36 @@ def list_files(path) -> list:
         candidates = sorted(os.listdir(path))
         # Change to the target directory in the same way as the UNIX cd command.
         os.chdir(path) 
-        return(candidates)
+    return candidates
+
+
+def isImage(file) -> bool : # the filename is an Image object
+    with open(file, 'rb') as image_file:
+        try:
+            my_image = Image(image_file)
+            my_image.has_exif
+            return True
+        except:
+            return False
+
+def files_to_lists(files):
+    regexp = r'[Oo][Rr][Ff]'
+    jpgs, orfs = [], []
+    for file in files:
+        filename = file.split('.') # split() returns a list
+        if isImage(file) and len(filename) == 1: #the filename doesn't contain an extension
+            jpgs.append(file)
+            orf = str(filename[0])+'.orf'
+            if orf in files:
+                orfs.append(orf)
+            else:
+                orfs.append(None)
+        elif isImage(file) and len(filename) == 2:
+            if fnmatch.fnmatch(filename[1], '[Jj][Pp][Gg]'):
+                jpgs.append(file)
+            elif fnmatch.fnmatch(filename[1], '[Oo][Rr][Ff]'):
+                orfs.append(file)
+    return jpgs, orfs
 
 
 def show_files(files, path):
@@ -39,24 +69,41 @@ def show_files(files, path):
         for i in islice(files, 0, MAX):
             count += 1
             print(i)
-    print('[...]\n')
+    print('[...]')
 
+path = input("Enter the location of the folder containing the Olympus files, for instance /home/user/pics: ")
+
+files = list_files(path)
+
+lists =files_to_lists(files)
+
+[print(jpg) for jpg in lists[0]] 
+
+"""
+for key in d_images.keys():
+
+    print("Compressed: " + d_images.get(key).get('compressed') + " Raw: " + d_images.get(key).get('raw')) 
 
 def classify_by_extension(candidates):
     jpgs, orfs = [], []
     for i in range(0,len(candidates)):
         file = candidates[i].split('.',maxsplit=1)
-        if fnmatch.fnmatch(file[1], '[Jj][Pp][Gg]'):
-            jpgs.append(candidates[i])
-        elif fnmatch.fnmatch(file[1], '[Oo][Rr][Ff]'):
-            orfs.append(candidates[i])
+        if len(file) == 1 and isinstance(candidates[i],Image): # the filename is image and it doesn't contain an extension
+            reconstructed = str(file[0])+'.JPG'
+            jpgs.append(reconstructed)
+        elif len(file) > 1:
+            if fnmatch.fnmatch(file[1], '[Jj][Pp][Gg]'):
+                jpgs.append(candidates[i])
+            elif fnmatch.fnmatch(file[1], '[Oo][Rr][Ff]'):
+                orfs.append(candidates[i])
+    print("THe compressed are {}".format(jpgs))
     return jpgs, orfs
 
 
 def find_mismatch(classified):
     unpaired = []
     for candidate in classified[0]+classified[1]:
-        filename = candidate.split('.')
+        filename = candidate.split('.') # The split() method splits a string into a list.
         reconstructed = str(filename[0])+'.JPG'
         regexp = r'[Oo][Rr][Ff]'
         z = re.match(regexp,filename[1])
@@ -67,7 +114,7 @@ def find_mismatch(classified):
 
 def remove_unpaired(orphan_orfs):
     if isinstance(orphan_orfs,list) and len(orphan_orfs) > 0:
-        print("\nThere are {} ORF raw files without equivalent JPG compressed versions.\n".format(len(orphan_orfs)))
+        print("There are {} ORF raw files without equivalent JPG compressed versions.\n".format(len(orphan_orfs)))
         for orphan in orphan_orfs:
             try:
                 os.remove(orphan)
@@ -82,18 +129,19 @@ def rename_files(jpgs, orfs):
         filename = jpg.split('.',maxsplit=1)[0]
         tagged = Image(jpg)
         new_name = tagged.datetime_original.replace(":", "").replace(" ","_")
-        new_jpg_name = new_name + '.jpg'
-        if jpg != new_jpg_name:
-            os.rename(jpg,new_jpg_name)
-            count += 1
-            print(jpg ,' > ', new_jpg_name)
-        orf = filename + '.' +'orf' 
-        if orf in orfs:
-            new_orf_name = new_name + '.orf'
-            if orf != new_orf_name:
-                os.rename(orf,new_orf_name)
+        if new_name != '0000-00-00 00:00:00.0000':
+            new_jpg_name = new_name + '.jpg'
+            if jpg != new_jpg_name and new_jpg_name != '0000-00-00 00:00:00.0000':
+                os.rename(jpg,new_jpg_name)
                 count += 1
-                print(orf ,' > ', new_orf_name)
+                print(jpg ,' > ', new_jpg_name)
+            orf = filename + '.' +'orf' 
+            if orf in orfs:
+                new_orf_name = new_name + '.orf'
+                if orf != new_orf_name:
+                    os.rename(orf,new_orf_name)
+                    count += 1
+                    print(orf ,' > ', new_orf_name)
     return count 
 # MAIN
 
@@ -103,24 +151,25 @@ path = input("Enter the location of the folder containing the Olympus files, for
 option = show_menu()
 
 while option != '0':
-    files = list_files(path) # refresh the list so that the options are independent of their previous one
+    files = list_files(path) # refresh the list so that the options are independent to each other
     if option == '1':
         show_files(files,path)
     elif option == '2':
+        print("\nThere are {} files.\n".format(len(files)))
         if remove_unpaired(find_mismatch(classify_by_extension(files))):
             print("\nAll the ORF files without equivalent JPEG were deleted.")
         else:
             print("\nAll the raw ORF files have compressed JPEG versions. No raw file to remove.")
     elif option == '3':
+        print("\nThere are {} files.\n".format(len(files)))
         res = rename_files(classify_by_extension(files)[0], classify_by_extension(files)[1])
         if res > 0:
-            print("Renamed {} files with their EXIF dates.".format(res))
+            print("\nRenamed {} files with their EXIF dates.".format(res))
         else:
             print("\nNo file renamed.")
-
     else:
         print("\nWrong option.")
-        
     option = show_menu()        
 
-print("\nBye.\n")   
+print("\nBye.\n")
+"""
