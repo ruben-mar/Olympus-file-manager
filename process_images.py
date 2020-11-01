@@ -10,7 +10,6 @@ import re
 import fnmatch
 from itertools import islice
 from exif import Image # https://pypi.org/project/exif/ It cannot process .ORF files
-import pandas as pd
 
 MAX = 5 # Limit of number of files to list in the output
 
@@ -41,25 +40,31 @@ def isImage(file) -> bool : # the filename is an Image object
         except:
             return False
 
-def files_to_lists(files):
-    regexp = r'[Oo][Rr][Ff]'
-    jpgs, orfs = [], []
-    for file in files:
-        filename = file.split('.') # split() returns a list
-        if isImage(file) and len(filename) == 1: #the filename doesn't contain an extension
-            jpgs.append(file)
-            orf = str(filename[0])+'.orf'
-            if orf in files:
-                orfs.append(orf)
-            else:
-                orfs.append(None)
-        elif isImage(file) and len(filename) == 2:
-            if fnmatch.fnmatch(filename[1], '[Jj][Pp][Gg]'):
-                jpgs.append(file)
-            elif fnmatch.fnmatch(filename[1], '[Oo][Rr][Ff]'):
-                orfs.append(file)
-    return jpgs, orfs
 
+def pairImages(files):
+    images =[]
+    enum = enumerate(files)
+    for e in enum:
+        filename = e[1].split('.') # split() returns a list
+        # Is Image and the filename doesn't contain more than one dot?
+        if isImage(e[1]) and len(filename) < 3:
+            for file in files:
+                if re.match(rf"{filename[0]}.[Oo][Rr][Ff]$", file):
+                    el = list(e) # turn the tuple to list so it can append elements
+                    el.append(file) # add the raw image
+                    images.append(el) # add the compressed image
+    return images
+
+path = input("Enter the location of the folder containing the Olympus files, for instance /home/user/pics: ")
+
+files = list_files(path)
+
+paired = pairImages(files)
+
+print(paired)
+
+
+"""
 
 def show_files(files, path):
     fslashes = len([key for key, val in enumerate(path) if val in set(["/"])]) 
@@ -70,57 +75,6 @@ def show_files(files, path):
             count += 1
             print(i)
     print('[...]')
-
-path = input("Enter the location of the folder containing the Olympus files, for instance /home/user/pics: ")
-
-files = list_files(path)
-
-lists =files_to_lists(files)
-
-[print(jpg) for jpg in lists[0]] 
-
-"""
-for key in d_images.keys():
-
-    print("Compressed: " + d_images.get(key).get('compressed') + " Raw: " + d_images.get(key).get('raw')) 
-
-def classify_by_extension(candidates):
-    jpgs, orfs = [], []
-    for i in range(0,len(candidates)):
-        file = candidates[i].split('.',maxsplit=1)
-        if len(file) == 1 and isinstance(candidates[i],Image): # the filename is image and it doesn't contain an extension
-            reconstructed = str(file[0])+'.JPG'
-            jpgs.append(reconstructed)
-        elif len(file) > 1:
-            if fnmatch.fnmatch(file[1], '[Jj][Pp][Gg]'):
-                jpgs.append(candidates[i])
-            elif fnmatch.fnmatch(file[1], '[Oo][Rr][Ff]'):
-                orfs.append(candidates[i])
-    print("THe compressed are {}".format(jpgs))
-    return jpgs, orfs
-
-
-def find_mismatch(classified):
-    unpaired = []
-    for candidate in classified[0]+classified[1]:
-        filename = candidate.split('.') # The split() method splits a string into a list.
-        reconstructed = str(filename[0])+'.JPG'
-        regexp = r'[Oo][Rr][Ff]'
-        z = re.match(regexp,filename[1])
-        if z and reconstructed.lower() not in classified[0]:
-            unpaired.append(candidate)
-    return unpaired
-
-
-def remove_unpaired(orphan_orfs):
-    if isinstance(orphan_orfs,list) and len(orphan_orfs) > 0:
-        print("There are {} ORF raw files without equivalent JPG compressed versions.\n".format(len(orphan_orfs)))
-        for orphan in orphan_orfs:
-            try:
-                os.remove(orphan)
-                print("Removed {}".format(orphan))        
-            except OSError as e:  ## if failed, report it back to the user ##
-                print("Error: %s - %s." % (e.file, e.strerror))
 
 
 def rename_files(jpgs, orfs):
@@ -143,6 +97,7 @@ def rename_files(jpgs, orfs):
                     count += 1
                     print(orf ,' > ', new_orf_name)
     return count 
+
 # MAIN
 
 # Ask where the folder with the files is.
