@@ -9,6 +9,7 @@ import fnmatch
 from itertools import islice
 from time import perf_counter
 from exif import Image # https://pypi.org/project/exif/ It cannot process .ORF files
+from functools import reduce
 
 MAX = 5 # Limit of number of files to list in the output
 
@@ -16,7 +17,7 @@ def show_menu():
     print()
     print("Enter 1 to see the list of files.")
     print("Enter 2 to rename files with their EXIF date.")
-    print("Enter 3 to remove orphan ORF files.")
+    print("Enter 3 to remove orphan ORF files. Rename with option 2 before removing with option 3.")
     print("Enter 0 to exit the application.")    
     option = input("\nEnter your option: ")
     return option
@@ -73,13 +74,14 @@ def listCommonName(jpgs,orfs) -> list:
     for raw in orfs:
         if raw.split('.')[0] in filenames:
             paired.append(raw.split('.')[0])
-    return paired # a lisf of filenames without extension that have compressed and raw files
+    return paired # a lisf of filenamepaireds without extension that have compressed and raw files
 
 
+"""
 def rename_files(jpgs, orfs) ->  int:
     count = 0
     for jpg in jpgs:
-        filename = jpg.split('.',maxsplit=1)[0]
+        filename = jpg.split('.')[0]
         tagged = Image(jpg)
         new_name = tagged.datetime_original.replace(":", "").replace(" ","_")
         new_jpg_name = new_name + '.jpg'
@@ -87,15 +89,16 @@ def rename_files(jpgs, orfs) ->  int:
             os.rename(jpg,new_jpg_name)
             count += 1
             print(jpg ,' renamed as ', new_jpg_name)
-        orf = filename + '.' +'orf' 
-        if orf in orfs:
-            new_orf_name = new_name + '.orf'
-            if orf != new_orf_name:
-                os.rename(orf,new_orf_name)
-                count += 1
-                print(orf ,' renamed to ', new_orf_name)
+        for orf in orfs:
+            https://www.cademuir.eu/blog/2011/10/20/python-searching-for-a-string-within-a-list-list-comprehension/
+            if re.match(rf"filename.[Oo][Rr][Ff]$", orf):
+                new_orf_name = new_name + '.orf'
+                if orf != new_orf_name:
+                    os.rename(orf,new_orf_name)
+                    count += 1
+                    print(orf ,' renamed to ', new_orf_name)
     return count 
-
+"""
 
 def remove_unpaired(files, compressed, paired) -> int:
     count = 0
@@ -106,6 +109,32 @@ def remove_unpaired(files, compressed, paired) -> int:
                 count += 1
             except:
                 print("Couldn't delete file {}".format(file))
+    return count
+
+def rename_orf(filename,new_name, raw):
+    r = re.compile(filename+"\.[Oo][Rr][Ff]")
+    newlist = list(filter(r.match, raw))
+    new_orf_name = new_name + '.orf'
+    for elem in newlist:
+        print(elem)
+        os.rename(elem,new_orf_name)
+
+
+def rename(files, paired, compressed, raw) -> int:
+    count = 0
+    for file in files:
+        if file.split('.')[0] not in paired and file not in compressed:
+            try:
+                os.remove(file)
+                count += 1
+            except:
+                print("Couldn't delete file {}".format(file))
+        elif file.split('.')[0] in paired and file in compressed:
+            tagged = Image(file)
+            new_name = tagged.datetime_original.replace(":", "").replace(" ","_")
+            new_jpg_name = new_name + '.jpg'
+            os.rename(file,new_jpg_name)
+            rename_orf(file.split('.')[0],new_name, raw)
     return count
 
 # MAIN
@@ -124,7 +153,8 @@ while option != '0':
     elif option == '2':
         start = perf_counter()
         count_before = len(list_files(path))
-        res = rename_files(classifyFiles(files)[0], classifyFiles(files)[1])
+        res = rename(files, listCommonName(classifyFiles(files)[0], classifyFiles(files)[1]), classifyFiles(files)[0], classifyFiles(files)[1])
+        # res = rename_files(classifyFiles(files)[0], classifyFiles(files)[1])
         if res > 0:
             end = perf_counter()
             print("\nRenamed {} files with their EXIF dates in {} seconds.".format(res, round(end-start,1)))
