@@ -1,23 +1,20 @@
 # Rename Olympus files with their EXIF date and remove raw images without compressed equivalent
 """
-The script removes raw images missing their compressed versions and it renames files with the extensions JPG and ORF. The date is not extracted from the ORF file but this script adds its to the raw files by taking it from the compressed one.
+The script removes raw images without their compressed versions and it renames files with the timestamp of their creation date. The date is not extracted from the ORF files but this script renames them by taking it from the compressed one.
 """
 
 import os
 import re
-import fnmatch
 from itertools import islice
 from time import perf_counter
 from exif import Image # https://pypi.org/project/exif/ It cannot process .ORF files
-from functools import reduce
 
 MAX = 5 # Limit of number of files to list in the output
 
 def show_menu():
     print()
     print("Enter 1 to see the list of files.")
-    print("Enter 2 to rename files with their EXIF date.")
-    print("Enter 3 to remove orphan ORF files. Rename with option 2 before removing with option 3.")
+    print("Enter 2 to remove orphan ORF files and rename files with their EXIF date.")
     print("Enter 0 to exit the application.")    
     option = input("\nEnter your option: ")
     return option
@@ -68,65 +65,28 @@ def classifyFiles(files) -> tuple:
 
 def listCommonName(jpgs,orfs) -> list:
     paired = []
-    filenames = []
     for jpg in jpgs:
-        filenames.append(jpg.split('.')[0])
-    for raw in orfs:
-        if raw.split('.')[0] in filenames:
-            paired.append(raw.split('.')[0])
-    return paired # a lisf of filenamepaireds without extension that have compressed and raw files
+        r = re.compile(jpg.split('.')[0])
+        if len(list(filter(r.match, orfs))) == 1:
+            paired.append(jpg.split('.')[0])
+    return paired
 
-
-"""
-def rename_files(jpgs, orfs) ->  int:
-    count = 0
-    for jpg in jpgs:
-        filename = jpg.split('.')[0]
-        tagged = Image(jpg)
-        new_name = tagged.datetime_original.replace(":", "").replace(" ","_")
-        new_jpg_name = new_name + '.jpg'
-        if jpg != new_jpg_name and new_jpg_name != '0000-00-00 00:00:00.0000':
-            os.rename(jpg,new_jpg_name)
-            count += 1
-            print(jpg ,' renamed as ', new_jpg_name)
-        for orf in orfs:
-            https://www.cademuir.eu/blog/2011/10/20/python-searching-for-a-string-within-a-list-list-comprehension/
-            if re.match(rf"filename.[Oo][Rr][Ff]$", orf):
-                new_orf_name = new_name + '.orf'
-                if orf != new_orf_name:
-                    os.rename(orf,new_orf_name)
-                    count += 1
-                    print(orf ,' renamed to ', new_orf_name)
-    return count 
-"""
-
-def remove_unpaired(files, compressed, paired) -> int:
-    count = 0
-    for file in files:
-        if file.split('.')[0] not in paired and file not in compressed:
-            try:
-                os.remove(file)
-                count += 1
-            except:
-                print("Couldn't delete file {}".format(file))
-    return count
 
 def rename_orf(filename,new_name, raw):
     r = re.compile(filename+"\.[Oo][Rr][Ff]")
     newlist = list(filter(r.match, raw))
     new_orf_name = new_name + '.orf'
     for elem in newlist:
-        print(elem)
         os.rename(elem,new_orf_name)
 
 
-def rename(files, paired, compressed, raw) -> int:
-    count = 0
+def rename(files, paired, compressed, raw) -> tuple:
+    removed, renamed = 0, 0
     for file in files:
         if file.split('.')[0] not in paired and file not in compressed:
             try:
                 os.remove(file)
-                count += 1
+                removed += 1
             except:
                 print("Couldn't delete file {}".format(file))
         elif file.split('.')[0] in paired and file in compressed:
@@ -134,15 +94,17 @@ def rename(files, paired, compressed, raw) -> int:
             new_name = tagged.datetime_original.replace(":", "").replace(" ","_")
             new_jpg_name = new_name + '.jpg'
             os.rename(file,new_jpg_name)
-            rename_orf(file.split('.')[0],new_name, raw)
-    return count
+            renamed += 1
+            if rename_orf(file.split('.')[0],new_name, raw):
+                renamed += 1
+    return removed, renamed
 
 # MAIN
 
 # Ask where the folder with the files is.
-path = input("Enter the location of the folder containing the Olympus files, for instance /home/user/downloads: ")
+path = input("Enter the path of the folder containing the Olympus files, for instance /home/user/downloads: ")
 while not os.path.exists(path):
-    path = input("Enter the location of the folder containing the Olympus files, for instance /home/user/downloads: ")
+    path = input("Enter the path of the folder containing the Olympus files, for instance /home/user/downloads: ")
 
 option = show_menu()
 
@@ -152,24 +114,21 @@ while option != '0':
         show_files(files,path)
     elif option == '2':
         start = perf_counter()
-        count_before = len(list_files(path))
-        res = rename(files, listCommonName(classifyFiles(files)[0], classifyFiles(files)[1]), classifyFiles(files)[0], classifyFiles(files)[1])
-        # res = rename_files(classifyFiles(files)[0], classifyFiles(files)[1])
-        if res > 0:
-            end = perf_counter()
-            print("\nRenamed {} files with their EXIF dates in {} seconds.".format(res, round(end-start,1)))
+        jpgs = classifyFiles(files)[0]
+        orfs = classifyFiles(files)[1]
+        paired = listCommonName(jpgs,orfs)
+        changes = rename(files, paired, jpgs, orfs)
+        end = perf_counter()
+        if changes[0] > 0 and changes[1] > 0:
+            print("\n{} ORF files without equivalent JPG were deleted.".format(changes[0]))
+            print("Renamed {} files with their EXIF dates in {} seconds.".format(changes[1], round(end-start,1)))
+        elif changes[0] > 0 and changes[1] == 0:
+            print("\n{} ORF files without equivalent JPG were deleted in {} seconds.".format(changes[0],round(end-start,1)))
+        elif changes[0] == 0 and changes[1] > 0:
+            print("\nAll the raw ORF files have compressed JPG versions. No raw file to remove.") 
+            print("Renamed {} files with their EXIF dates in {} seconds.".format(changes[1], round(end-start,1)))
         else:
-            print("\nNo file renamed.")
-    elif option == '3':
-        start = perf_counter()
-        count_before = len(list_files(path))
-        matched = listCommonName(classifyFiles(files)[0], classifyFiles(files)[1])
-        if remove_unpaired(files, classifyFiles(files)[0], matched) > 0:
-            count_after = len(list_files(path))
-            end = perf_counter()
-            print("\n{} ORF files without equivalent JPG were deleted in {} seconds.".format(count_before-count_after,round(end-start,1)))
-        else:
-            print("\nAll the raw ORF files have compressed JPG versions. No raw file to remove.")
+            print("\nNo file removed or renamed.")
     else:
         print("\nWrong option.")
     option = show_menu()        

@@ -2,7 +2,7 @@ README
 
 # Olympus-file-manager
 
-This application renames batches of ORF files with the date and time of the creation of the picture. The date in the file names allow the storage of massive amounts of images recorded in RAW mode in the same folder, easy to sort and select.
+This application renames batches of ORF files with the date and time of the creation of the picture. The date in the file names allow the storage of batches of images recorded in RAW mode in the same folder, easy to sort and select.
 
 [![Hex.pm](https://img.shields.io/hexpm/l/plug.svg)](/LICENSE.md)
 
@@ -10,11 +10,11 @@ This application renames batches of ORF files with the date and time of the crea
 
 ## 1.1. RAW files and their JPEG equivalent
 
-Olympus cameras save their loss less compressed RAW pictures in a ORF file format. The size of ORF files is approx. 17.3 MB. The size of their equivalent lossy compressed JPEG ones is rarely larger than 10 MB (even for counts of pixels larger than 3200 x 2400 and compression rates of 1/2.7).
+Olympus cameras save their loss less compressed RAW pictures in a ORF file format, based in TIFF. The size of ORF files is approx. 17.3 MB. The size of their equivalent lossy compressed JPEG ones is rarely larger than 10 MB (even for counts of pixels larger than 3200 x 2400 and compression rates of 1/2.7).
 
 ## 1.2. Exploring your photos and managing JPEG and ORF files
 
-The imported JPEG image files from Olympus digital cameras are easier to browse than the heavier ORF ones because computers load JPEG files faster.
+The imported JPEG image files from Olympus digital cameras are easier to browse than the heavier ORF ones because computers load the comparatively lighter JPEG files faster.
 
 Image viewers allow the removal of consecutive JPEG files as you examine the content of the folder containing the imported images. The deletion of JPEG files leaves their ORF equivalent in the folder. These orphan ORF files can be deleted.
 
@@ -33,11 +33,9 @@ This application removes orphaned ORF files whose JPEG equivalent ones where rem
 ## 2.1. Requirements
 
 This application is written in Python so it runs successfully on the following operating systems:
-
-- *Linux*
-- *Windows*
-- *Mac OS*
-
+    - *Linux*
+    - *Windows*
+    - *Mac OS*
 as long as they have Python >=3.6 and the project [exif](https://pypi.org/project/exif/) installed.
 
 > pip install exif
